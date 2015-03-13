@@ -195,15 +195,15 @@ data Command
 
 create :: Parser Command
 create = Create
-         <$> option auto (long "conf" <> value "nss.yml" <> metavar "CONFILE")
+         <$> option auto (long "conf" <> value "network-builder.yml" <> metavar "CONFILE")
 
 destroy :: Parser Command
 destroy = Destroy
-          <$> option auto (long "conf" <> value "nss.yml" <> metavar "CONFILE")
+          <$> option auto (long "conf" <> value "network-builder.yml" <> metavar "CONFILE")
 
 showYaml :: Parser Command
 showYaml = Show
-           <$> option auto (long "conf" <> value "nss.yml" <> metavar "CONFILE")
+           <$> option auto (long "conf" <> value "network-builder.yml" <> metavar "CONFILE")
 
 parse :: Parser Command
 parse = subparser $ 
