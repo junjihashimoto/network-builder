@@ -1,0 +1,6 @@
+- name: server4
+- Name: gre2
+  LocalIp: 192.168.10.3
+  RemoteIp: 192.168.10.2
+  RemoteNetwork: 192.168.11.0/24
+  GreDeviceIp: 192.168.12.254/24

@@ -10,7 +10,6 @@ nss:
           - - - ip: 192.168.11.4/24
                 name: veth-3
               - name: server3
-                nss: []
     - - ip: 192.168.10.3/24
         name: veth-4
       - name: server4
@@ -20,4 +19,3 @@ nss:
           - - - ip: 192.168.12.4/24
                 name: veth-5
               - name: server5
-                nss: []
