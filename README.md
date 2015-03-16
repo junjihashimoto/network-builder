@@ -45,7 +45,8 @@ put yaml file(just example) below.
 
 ```
 - name: server2
-- Name: gre2
+- tag: gretunnel
+  Name: gre2
   LocalIp: 192.168.10.2
   RemoteIp: 192.168.10.3
   RemoteNetwork: 192.168.12.0/24

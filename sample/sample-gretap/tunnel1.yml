@@ -1,0 +1,6 @@
+- name: server4
+- tag: gretaptunnel
+  Name: gre2
+  LocalIp: 192.168.10.3
+  RemoteIp: 192.168.10.2
+  GreTapBridge: br1

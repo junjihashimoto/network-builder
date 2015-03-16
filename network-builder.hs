@@ -11,14 +11,14 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
 import Data.Monoid
-import Data.Maybe
+--import Data.Maybe
 import Control.Monad
 import Control.Exception
 import Options.Applicative
 import Data.Char
 import qualified Data.Yaml as Y
 import qualified Data.Aeson.TH as A
-import qualified Data.ByteString.Char8 as B
+--import qualified Data.ByteString.Char8 as B
 
 default (T.Text)
 
@@ -60,6 +60,12 @@ data Tunnel =
   , gLocalIp :: T.Text
   , gRemoteNetwork :: T.Text
   , gGreDeviceIp :: T.Text
+  } | 
+  GreTapTunnel {
+    gName :: T.Text
+  , gRemoteIp :: T.Text
+  , gLocalIp :: T.Text
+  , gGreTapBridge :: T.Text
   }
   deriving (Show,Eq)
 $(A.deriveJSON A.defaultOptions{A.fieldLabelModifier = drop 1, A.constructorTagModifier = map toLower} ''Tunnel)
@@ -198,6 +204,7 @@ createNetworkNameSpaces' host ns = do
 deleteNetworkNameSpaces :: HostServer -> Sh ()
 deleteNetworkNameSpaces host = deleteNetworkNameSpaces' host host
 
+ignore :: Sh a -> Sh ()
 ignore act = (void $ act) `catch_sh` \(err :: SomeException) -> liftIO $ putStrLn $ show err
 
 deleteNetworkNameSpaces' :: VirtualServer a => HostServer -> a -> Sh ()
@@ -216,11 +223,15 @@ deleteNetworkNameSpaces' host ns = do
 
 createTunnel ::  VirtualServer a => a -> Tunnel -> Sh ()
 createTunnel ns GreTunnel{..} = do
-  runNs ns "ip" ["tunnel", "add", gName, "mode", "gre", "remote", gRemoteIp, "local", gLocalIp]
-  runNs ns "ip" ["link", "set", gName, "up"]
-  runNs ns "ip" ["addr", "add", gGreDeviceIp, "dev", gName]
-  runNs ns "ip" ["route", "add", gRemoteNetwork, "dev", gName]
-  return ()
+  void $ runNs ns "ip" ["tunnel", "add", gName, "mode", "gre", "remote", gRemoteIp, "local", gLocalIp]
+  void $ runNs ns "ip" ["link", "set", gName, "up"]
+  void $ runNs ns "ip" ["addr", "add", gGreDeviceIp, "dev", gName]
+  void $ runNs ns "ip" ["route", "add", gRemoteNetwork, "dev", gName]
+
+createTunnel ns GreTapTunnel{..} = do
+  void $ runNs ns "ip" ["link", "add", gName, "type", "gretap", "remote", gRemoteIp, "local", gLocalIp]
+  void $ runNs ns "ip" ["link", "set", gName, "up"]
+  void $ runNs ns "ip" ["link", "set", gName, "master", gGreTapBridge]
 
 deleteTunnel ::  VirtualServer a => a -> Tunnel -> Sh ()
 deleteTunnel ns GreTunnel{..} = do
@@ -228,6 +239,10 @@ deleteTunnel ns GreTunnel{..} = do
   ignore $ runNs ns "ip" ["addr", "del", gGreDeviceIp, "dev", gName]
   ignore $ runNs ns "ip" ["link", "set", gName, "down"]
   ignore $ runNs ns "ip" ["tunnel", "del", gName]
+  return ()
+deleteTunnel ns GreTapTunnel{..} = do
+  ignore $ runNs ns "ip" ["link", "set", gName, "down"]
+  ignore $ runNs ns "ip" ["link", "del", gName]
   return ()
 
 data Command
@@ -289,9 +304,9 @@ runCmd (CreateTunnel file) = shelly $ do
   eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (NetworkNameSpace,Tunnel))
   case eyaml of
     Right (netconf,tunnelconf) -> createTunnel netconf tunnelconf
-    Left err -> do
-      eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
-      case eyaml of
+    Left _err -> do
+      eyaml' <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
+      case eyaml' of
         Right (netconf,tunnelconf) -> createTunnel netconf tunnelconf
         Left err -> echo $ T.pack $ show err
     
@@ -299,21 +314,22 @@ runCmd (DestroyTunnel file) = shelly $ do
   eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (NetworkNameSpace,Tunnel))
   case eyaml of
     Right (netconf,tunnelconf) -> deleteTunnel netconf tunnelconf
-    Left err -> do
-      eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
-      case eyaml of
+    Left _err -> do
+      eyaml' <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
+      case eyaml' of
         Right (netconf,tunnelconf) -> deleteTunnel netconf tunnelconf
         Left err -> echo $ T.pack $ show err
 
 runCmd (ShowTunnel file) = shelly $ do
   eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (NetworkNameSpace,Tunnel))
   case eyaml of
-    Right a@(netconf,tunnelconf) -> echo $ T.decodeUtf8 $ Y.encode a
-    Left err -> do
-      eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
-      case eyaml of
-        Right a@(netconf,tunnelconf) -> echo $ T.decodeUtf8 $ Y.encode a
+    Right a -> echo $ T.decodeUtf8 $ Y.encode a
+    Left _err -> do
+      eyaml' <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
+      case eyaml' of
+        Right a -> echo $ T.decodeUtf8 $ Y.encode a
         Left err -> echo $ T.pack $ show err
+
 
 runCmd (Show file) = shelly $ do
   eyaml <- liftIO $ (Y.decodeFileEither file :: IO (Either Y.ParseException HostServer))
