@@ -27,11 +27,11 @@ data Command
 
 create :: Parser Command
 create = Create
-         <$> option auto (long "conf" <> value "network-builder.yml" <> metavar "CONFILE")
+         <$> option str (long "conf" <> value "network-builder.yml" <> metavar "CONFILE")
 
 destroy :: Parser Command
 destroy = Destroy
-          <$> option auto (long "conf" <> value "network-builder.yml" <> metavar "CONFILE")
+          <$> option str (long "conf" <> value "network-builder.yml" <> metavar "CONFILE")
 
 createTun :: Parser Command
 createTun = CreateTunnel
@@ -58,55 +58,41 @@ parse = subparser $
           command "destroy-tunnel" (info destroyTun (progDesc "destroy tunnel")) <>
           command "show-tunnel" (info showTun (progDesc "show tunnel"))
 
+runCmd' :: String -> (HostServer -> Sh a) -> IO a
+runCmd' file action' = shelly $ do
+  echo $ T.pack file
+  eyaml <- liftIO $ Y.decodeFileEither file
+  case eyaml of
+    Right conf -> action' conf
+    Left err -> do
+      echo $ T.pack $ show err
+      exit 1
+
+runCmd'' :: String
+         -> (NetworkNameSpace -> Tunnel -> Sh a)
+         -> (HostServer -> Tunnel -> Sh a)
+         -> IO a
+runCmd'' file act0 act1 = shelly $ do
+  eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (NetworkNameSpace,Tunnel))
+  case eyaml of
+    Right (netconf,tunnelconf) -> act0 netconf tunnelconf
+    Left _err -> do
+      eyaml' <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
+      case eyaml' of
+        Right (netconf,tunnelconf) -> act1 netconf tunnelconf
+        Left err -> do
+          echo $ T.pack $ show err
+          exit 1
 
 runCmd :: Command -> IO ()
-runCmd (Create file) = shelly $ do
-  eyaml <- liftIO $ Y.decodeFileEither file
-  case eyaml of
-    Right conf -> createNetworkNameSpaces conf
-    Left err -> echo $ T.pack $ show err
-    
-runCmd (Destroy file) = shelly $ do
-  eyaml <- liftIO $ Y.decodeFileEither file
-  case eyaml of
-    Right conf -> deleteNetworkNameSpaces conf
-    Left err -> echo $ T.pack $ show err
-
-runCmd (CreateTunnel file) = shelly $ do
-  eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (NetworkNameSpace,Tunnel))
-  case eyaml of
-    Right (netconf,tunnelconf) -> createTunnel netconf tunnelconf
-    Left _err -> do
-      eyaml' <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
-      case eyaml' of
-        Right (netconf,tunnelconf) -> createTunnel netconf tunnelconf
-        Left err -> echo $ T.pack $ show err
-    
-runCmd (DestroyTunnel file) = shelly $ do
-  eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (NetworkNameSpace,Tunnel))
-  case eyaml of
-    Right (netconf,tunnelconf) -> deleteTunnel netconf tunnelconf
-    Left _err -> do
-      eyaml' <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
-      case eyaml' of
-        Right (netconf,tunnelconf) -> deleteTunnel netconf tunnelconf
-        Left err -> echo $ T.pack $ show err
-
-runCmd (ShowTunnel file) = shelly $ do
-  eyaml <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (NetworkNameSpace,Tunnel))
-  case eyaml of
-    Right a -> echo $ T.decodeUtf8 $ Y.encode a
-    Left _err -> do
-      eyaml' <- liftIO $ Y.decodeFileEither file :: Sh (Either Y.ParseException (HostServer,Tunnel))
-      case eyaml' of
-        Right a -> echo $ T.decodeUtf8 $ Y.encode a
-        Left err -> echo $ T.pack $ show err
-
-runCmd (Show file) = shelly $ do
-  eyaml <- liftIO $ (Y.decodeFileEither file :: IO (Either Y.ParseException HostServer))
-  case eyaml of
-    Right conf -> echo $ T.pack $ show conf
-    Left err -> echo $ T.pack $ show err
+runCmd (Create file) = runCmd' file createNetworkNameSpaces
+runCmd (Destroy file) = runCmd' file deleteNetworkNameSpaces
+runCmd (Show file) = runCmd' file $ echo . T.pack . show
+runCmd (CreateTunnel file) = runCmd'' file createTunnel createTunnel
+runCmd (DestroyTunnel file) = runCmd'' file deleteTunnel deleteTunnel
+runCmd (ShowTunnel file) = runCmd'' file 
+                           (\n t -> echo $ T.decodeUtf8 $ Y.encode (n,t))
+                           (\n t -> echo $ T.decodeUtf8 $ Y.encode (n,t))
 
 opts :: ParserInfo Command
 opts = info (parse <**> helper) idm

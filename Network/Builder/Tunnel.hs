@@ -55,12 +55,14 @@ createTunnel ::  VirtualServer a => a -> Tunnel -> Sh ()
 createTunnel ns GreTunnel{..} = do
   void $ runNs ns "ip" ["tunnel", "add", gName, "mode", "gre", "remote", gRemoteIp, "local", gLocalIp]
   void $ runNs ns "ip" ["link", "set", gName, "up"]
+  void $ runNs ns "ip" ["link", "set", gName, "mtu", "1462"]
   void $ runNs ns "ip" ["addr", "add", gGreDeviceIp, "dev", gName]
   void $ runNs ns "ip" ["route", "add", gRemoteNetwork, "dev", gName]
 
 createTunnel ns GreTapTunnel{..} = do
   void $ runNs ns "ip" ["link", "add", gName, "type", "gretap", "remote", gRemoteIp, "local", gLocalIp]
   void $ runNs ns "ip" ["link", "set", gName, "up"]
+  void $ runNs ns "ip" ["link", "set", gName, "mtu", "1462"]
   void $ runNs ns "ip" ["link", "set", gName, "master", gGreTapBridge]
 
 deleteTunnel ::  VirtualServer a => a -> Tunnel -> Sh ()
