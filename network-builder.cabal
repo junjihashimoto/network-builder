@@ -58,3 +58,16 @@ executable network-builder
   -- hs-source-dirs:      
   default-language:    Haskell2010
   ghc-options:       -Wall
+
+test-suite test
+    type:              exitcode-stdio-1.0
+    main-is:           test.hs
+    hs-source-dirs:    tests,dist/build/autogen
+    ghc-options:       -Wall
+
+    build-depends:     base
+                      ,hspec
+                      ,hspec-server
+                      ,cabal-test-bin
+                      ,process
+    Default-Language:   Haskell2010
