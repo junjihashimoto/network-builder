@@ -22,6 +22,27 @@ extra-source-files:
   ChangeLog.md
   README.md
 
+source-repository head
+  type:           git
+  location:       https://github.com/junjihashimoto/network-builder.git
+
+library
+  exposed-modules:     Network.Builder
+                     , Network.Builder.Namespace
+                     , Network.Builder.Tunnel
+  -- other-modules:       
+  -- other-extensions:    
+  build-depends:       base >=4 && <5
+                      ,aeson
+                      ,yaml
+                      ,shelly
+                      ,text
+                      ,bytestring
+
+  -- hs-source-dirs:      
+  ghc-options:       -Wall -O2
+  default-language:    Haskell2010
+
 executable network-builder
   main-is:             network-builder.hs
   -- other-modules:       
@@ -33,6 +54,7 @@ executable network-builder
                       ,text
                       ,bytestring
                       ,optparse-applicative
+                      ,network-builder
   -- hs-source-dirs:      
   default-language:    Haskell2010
   ghc-options:       -Wall
